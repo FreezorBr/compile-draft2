@@ -247,18 +247,31 @@ function renderDashboard(){
 // ===== GAME =====
 function novaPartida(){
     restantes=shuffle([...pool]).slice(0,numProt.value);
-    picks={A:[],B:[]};
+    picks = {
+    A: [],
+    B: []
+};
     fase="draft";
     turno=0;
     render();
 }
 
 function clicar(c){
-    let j=ordem[turno];
+    if(turno >= ordem.length) return;
+
+    let j = ordem[turno];
+
+    if(!picks[j]){
+        picks[j] = [];
+    }
+
     picks[j].push(c);
-    restantes=restantes.filter(x=>x!==c);
+    restantes = restantes.filter(x=>x!==c);
+
     turno++;
-    if(turno===6)finalizar();
+
+    if(turno===6) finalizar();
+
     render();
 }
 
