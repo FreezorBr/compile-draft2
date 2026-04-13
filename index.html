@@ -331,7 +331,6 @@ function renderDashboard(){
     <b>Combos</b>
     ${comb.slice(0,5).map(x=>`${x.n} ${(x.wr*100).toFixed(0)}%`).join("<br>")}
     `;
-}
 
 // ===== GAME =====
 function novaPartida(){
@@ -350,9 +349,6 @@ function clicar(c){
 
     let j = ordem[turno];
 
-    if(!picks[j]){
-        picks[j] = [];
-    }
 
     picks[j].push(c);
 
