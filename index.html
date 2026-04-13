@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compile Draft</title>
+
+<style>
+body { margin:0; background:#111; color:#fff; font-family:-apple-system; }
+header { padding:10px; text-align:center; background:#1a1a1a; }
+
+button { padding:10px; margin:4px; border:none; border-radius:8px; background:#333; color:#fff; }
+button.small { padding:6px 8px; font-size:12px; }
+
+input { width:60px; text-align:center; border-radius:6px; border:none; }
+
+.grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:10px; }
+
+.card { padding:16px; background:#222; border-radius:10px; text-align:center; transition:.15s; }
+
+.ban { background:#8b0000!important; }
+.pickA { background:#2b4eff!important; }
+.pickB { background:#2faa2f!important; }
+
+.players { display:flex; justify-content:space-around; padding:10px; }
+
+.box { width:45%; padding:8px; border-radius:8px; background:#1a1a1a; }
+
+.activeA { outline:2px solid #2b4eff; }
+.activeB { outline:2px solid #2faa2f; }
+
+.history { padding:10px; font-size:12px; max-height:260px; overflow:auto; border-top:1px solid #333; }
+
+.status { margin-top:6px; font-size:14px; }
+
+table { width:100%; border-collapse:collapse; margin-top:8px; }
+td,th { border-bottom:1px solid #333; padding:4px; font-size:11px; text-align:left; }
+</style>
+</head>
+
+<body>
+
+<header>
+Prot <input id="numProt" value="9">
+Bans <input id="numBan" value="2">
+Seed <input id="seedInput" placeholder="auto">
+<br>
+<button onclick="novaPartida()">Nova</button>
+<button onclick="undo()">Desfazer</button>
+<button onclick="resetPool()">Reset Pool</button>
+
+<div class="status" id="status"></div>
+Pool global: <span id="poolSize"></span>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<div class="players">
+<div id="boxA" class="box">A:<br><span id="A"></span></div>
+<div id="boxB" class="box">B:<br><span id="B"></span></div>
+</div>
+
+<div class="history">
+<b>Histórico</b>
+<div id="history"></div>
+</div>
+
+<div class="history">
+<b>Dashboard</b>
+<div id="dashboard"></div>
+</div>
+
+<script>
+// ===== DADOS =====
+let poolInicial = [
+"Apathy","Clarity","Darkness","Fear","Hate","Light","Metal","Plague","Speed","Unity",
+"Assimilation","Corruption","Death","Fire","Ice","Love","Mirror","Psychic","Spirit","War",
+"Chaos","Courage","Diversity","Gravity","Life","Luck","Peace","Smoke","Time","Water"
+];
+
+let pool=[...poolInicial];
+let restantes=[], picks={A:[],B:[]};
+
+let fase="", bansRestantes=0, jogadorBan="A";
+let turno=0;
+
+const ordem=["A","B","B","A","A","B"];
+
+let stack=[];
+let historico = JSON.parse(localStorage.getItem("draftHistory")||"[]");
+
+// ===== SOM =====
+const ctx=new (window.AudioContext||window.webkitAudioContext)();
+function beep(f){let o=ctx.createOscillator(),g=ctx.createGain();
+o.connect(g);g.connect(ctx.destination);
+o.frequency.value=f;g.gain.value=.05;o.start();o.stop(ctx.currentTime+.08);}
+const somBan=()=>beep(180), somA=()=>beep(700), somB=()=>beep(500);
+
+// ===== SEED =====
+function gerarSeed(){ return Math.random().toString(36).slice(2,8); }
+
+function seededRandom(seed){
+    let s = seed.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+    return function(){
+        s = (s * 9301 + 49297) % 233280;
+        return s / 233280;
+    }
+}
+
+function shuffle(arr, seed){
+    let rand = seed ? seededRandom(seed) : Math.random;
+    for(let i=arr.length-1;i>0;i--){
+        let j=Math.floor(rand()*(i+1));
+        [arr[i],arr[j]]=[arr[j],arr[i]];
+    }
+    return arr;
+}
+
+// ===== ESTADO =====
+function salvarEstado(){
+    stack.push(JSON.stringify({
+        pool:[...pool],
+        restantes:[...restantes],
+        picks:{A:[...picks.A], B:[...picks.B]},
+        fase,bansRestantes,jogadorBan,turno
+    }));
+}
+
+function undo(){
+    if(!stack.length) return;
+    let s=JSON.parse(stack.pop());
+    pool=s.pool;
+    restantes=s.restantes;
+    picks=s.picks;
+    fase=s.fase;
+    bansRestantes=s.bansRestantes;
+    jogadorBan=s.jogadorBan;
+    turno=s.turno;
+    render();
+}
+
+// ===== UI =====
+function render(){
+    poolSize.innerText=pool.length;
+    A.innerText=picks.A.join(", ");
+    B.innerText=picks.B.join(", ");
+
+    boxA.classList.remove("activeA");
+    boxB.classList.remove("activeB");
+
+    if(fase==="ban"){
+        status.innerText=`BAN → ${jogadorBan} (${bansRestantes})`;
+        jogadorBan==="A"?boxA.classList.add("activeA"):boxB.classList.add("activeB");
+    }
+    else if(fase==="draft"){
+        let j=ordem[turno];
+        status.innerText=`PICK ${turno+1}/6 → ${j}`;
+        j==="A"?boxA.classList.add("activeA"):boxB.classList.add("activeB");
+    }
+    else if(fase==="fim"){
+        status.innerText="Finalizado";
+    }
+
+    grid.innerHTML="";
+    restantes.forEach(c=>{
+        let el=document.createElement("div");
+        el.className="card";
+        el.innerText=c;
+        el.onclick=()=>clicar(c,el);
+        grid.appendChild(el);
+    });
+
+    renderHistory();
+    renderDashboard();
+}
+
+// ===== HISTÓRICO =====
+function renderHistory(){
+    const el=document.getElementById("history");
+
+    el.innerHTML = historico.map((h,i)=>{
+        let vencedor=h.winner||"";
+
+        return `
+        <div>
+        <b>${h.data}</b><br>
+        Prot:${h.config.prot} | Bans:${h.config.bans} | Seed:${h.seed}<br>
+
+        <span style="${vencedor==='A'?'color:#4ea1ff':''}">A: ${h.A}</span><br>
+        <span style="${vencedor==='B'?'color:#5cff7a':''}">B: ${h.B}</span><br>
+
+        <button class="small" onclick="setWinner(${i},'A')">A venceu</button>
+        <button class="small" onclick="setWinner(${i},'B')">B venceu</button>
+        <button class="small" onclick="deleteMatch(${i})">Excluir</button>
+
+        ${vencedor?`<br><b>Vencedor: ${vencedor}</b>`:""}
+        </div><hr>`;
+    }).join("");
+}
+
+function salvarHistorico(){
+    historico.unshift({
+        A:picks.A.join(", "),
+        B:picks.B.join(", "),
+        config:{prot:numProt.value,bans:numBan.value},
+        seed:seedInput.value,
+        winner:null,
+        data:new Date().toLocaleString()
+    });
+
+    localStorage.setItem("draftHistory", JSON.stringify(historico));
+}
+
+function setWinner(i,p){
+    historico[i].winner=p;
+    localStorage.setItem("draftHistory", JSON.stringify(historico));
+    render();
+}
+
+function deleteMatch(i){
+    historico.splice(i,1);
+    localStorage.setItem("draftHistory", JSON.stringify(historico));
+    render();
+}
+
+// ===== DASHBOARD =====
+function renderDashboard(){
+    const el=document.getElementById("dashboard");
+
+    let valid = historico.filter(h=>h.winner);
+
+    if(!valid.length){
+        el.innerHTML="<i>Sem dados com vencedor</i>";
+        return;
+    }
+
+    let stats={}, combos={}, totalA=0,totalB=0;
+
+    valid.forEach(h=>{
+        if(h.winner==="A") totalA++;
+        if(h.winner==="B") totalB++;
+
+        let Ateam=h.A.split(", ");
+        let Bteam=h.B.split(", ");
+
+        [...Ateam,...Bteam].forEach(p=>{
+            if(!stats[p]) stats[p]={pick:0,win:0};
+            stats[p].pick++;
+        });
+
+        (h.winner==="A"?Ateam:Bteam).forEach(p=>stats[p].win++);
+
+        function addCombos(team, won){
+            for(let i=0;i<team.length;i++){
+                for(let j=i+1;j<team.length;j++){
+                    let key=[team[i],team[j]].sort().join(" + ");
+                    if(!combos[key]) combos[key]={pick:0,win:0};
+                    combos[key].pick++;
+                    if(won) combos[key].win++;
+                }
+            }
+        }
+
+        addCombos(Ateam, h.winner==="A");
+        addCombos(Bteam, h.winner==="B");
+    });
+
+    let lista = Object.entries(stats).map(([n,v])=>({
+        nome:n, pick:v.pick, win:v.win, wr:v.win/v.pick
+    })).sort((a,b)=>b.wr-a.wr);
+
+    let comboLista = Object.entries(combos).map(([n,v])=>({
+        nome:n, pick:v.pick, win:v.win, wr:v.win/v.pick
+    })).sort((a,b)=>b.wr-a.wr);
+
+    el.innerHTML=`
+    <div><b>Vitórias</b><br>A:${totalA} | B:${totalB}</div>
+
+    <b>Top Protocolos</b>
+    <table>
+    <tr><th>Prot</th><th>WR%</th></tr>
+    ${
+        lista.slice(0,10).map(p=>`
+        <tr><td>${p.nome}</td><td>${(p.wr*100).toFixed(0)}%</td></tr>`).join("")
+    }
+    </table>
+
+    <b>Top Combinações</b>
+    <table>
+    <tr><th>Combo</th><th>WR%</th></tr>
+    ${
+        comboLista.slice(0,10).map(c=>`
+        <tr><td>${c.nome}</td><td>${(c.wr*100).toFixed(0)}%</td></tr>`).join("")
+    }
+    </table>
+    `;
+}
+
+// ===== FLUXO =====
+function novaPartida(){
+    let n=+numProt.value;
+    let b=+numBan.value;
+
+    if(pool.length<n){ alert("Pool insuficiente"); return; }
+
+    let seed=seedInput.value||(seedInput.value=gerarSeed());
+
+    restantes = shuffle([...pool],seed).slice(0,n);
+
+    picks={A:[],B:[]};
+    turno=0;
+    bansRestantes=b;
+    jogadorBan="A";
+    fase=b>0?"ban":"draft";
+
+    stack=[];
+    render();
+}
+
+function clicar(carta,el){
+    salvarEstado();
+
+    if(fase==="ban"){
+        el.classList.add("ban"); somBan();
+        setTimeout(()=>{
+            restantes = restantes.filter(x=>x!==carta);
+            bansRestantes--;
+            jogadorBan = jogadorBan==="A"?"B":"A";
+            if(bansRestantes===0){ fase="draft"; turno=0; }
+            render();
+        },150);
+    }
+    else if(fase==="draft"){
+        let j=ordem[turno];
+        el.classList.add(j==="A"?"pickA":"pickB");
+        j==="A"?somA():somB();
+        setTimeout(()=>{
+            picks[j].push(carta);
+            restantes = restantes.filter(x=>x!==carta);
+            turno++;
+            if(turno===6) finalizar();
+            render();
+        },150);
+    }
+}
+
+function finalizar(){
+    fase="fim";
+    let usados=[...picks.A,...picks.B];
+    pool = pool.filter(p=>!usados.includes(p));
+    salvarHistorico();
+    render();
+}
+
+function resetPool(){
+    pool=[...poolInicial];
+    render();
+}
+
+// ===== INIT =====
+render();
+</script>
+
+</body>
+</html>
