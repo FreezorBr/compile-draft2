@@ -70,12 +70,13 @@ Pool global: <span id="poolSize"></span>
 <div id="dashboard"></div>
 </div>
     
+<!-- 🔥 APENAS A PARTE CORRIGIDA DO FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: AIzaSyAZ0oBi3JraRKxxMQ3Gai7vgZZOL86sB-A",
+  apiKey: "AIzaSyAZ0oBi3JraRKxxMQ3Gai7vgZZOL86sB-A",
   authDomain: "compile-draft-23ef2.firebaseapp.com",
   projectId: "compile-draft-23ef2",
   storageBucket: "compile-draft-23ef2.firebasestorage.app",
@@ -86,7 +87,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// deixar global
 window.db = db;
 window.fb = { collection, addDoc, getDocs, deleteDoc, doc };
 </script>
@@ -247,16 +247,24 @@ async function salvarHistorico(){
     render();
 }
 
-function setWinner(i,p){
-    historico[i].winner=p;
-    localStorage.setItem("draftHistory", JSON.stringify(historico));
-    render();
+async function setWinner(i,p){
+    let h = historico[i];
+
+    await fb.deleteDoc(fb.doc(db, "matches", h.id));
+
+    h.winner = p;
+
+    await fb.addDoc(fb.collection(db, "matches"), h);
+
+    carregarHistoricoGlobal();
 }
 
-function deleteMatch(i){
-    historico.splice(i,1);
-    localStorage.setItem("draftHistory", JSON.stringify(historico));
-    render();
+async function deleteMatch(i){
+    let h = historico[i];
+
+    await fb.deleteDoc(fb.doc(db, "matches", h.id));
+
+    carregarHistoricoGlobal();
 }
 
 // ===== DASHBOARD =====
@@ -380,11 +388,11 @@ function clicar(carta,el){
     }
 }
 
-function finalizar(){
+async function finalizar(){
     fase="fim";
     let usados=[...picks.A,...picks.B];
     pool = pool.filter(p=>!usados.includes(p));
-    salvarHistorico();
+    await salvarHistorico();
     render();
 }
 
