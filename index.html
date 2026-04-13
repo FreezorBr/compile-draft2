@@ -8,25 +8,10 @@
 <style>
 body { margin:0; background:#111; color:#fff; font-family:-apple-system; }
 header { padding:10px; text-align:center; background:#1a1a1a; }
-
 button { padding:10px; margin:4px; border:none; border-radius:8px; background:#333; color:#fff; }
-button.small { padding:6px 8px; font-size:12px; }
-
-input { width:60px; text-align:center; border-radius:6px; border:none; }
-
 .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:10px; }
-
 .card { padding:16px; background:#222; border-radius:10px; text-align:center; }
-
-.players { display:flex; justify-content:space-around; padding:10px; }
-.box { width:45%; padding:8px; border-radius:8px; background:#1a1a1a; }
-
-.history { padding:10px; font-size:12px; max-height:260px; overflow:auto; border-top:1px solid #333; }
-
-.status { margin-top:6px; font-size:14px; }
-
-table { width:100%; border-collapse:collapse; margin-top:8px; }
-td,th { border-bottom:1px solid #333; padding:4px; font-size:11px; }
+.history { padding:10px; font-size:12px; }
 </style>
 </head>
 
@@ -34,21 +19,16 @@ td,th { border-bottom:1px solid #333; padding:4px; font-size:11px; }
 
 <header>
 <div id="auth"></div>
-
-Prot <input id="numProt" value="9">
-Bans <input id="numBan" value="2">
-<br>
-<button onclick="novaPartida()">Nova</button>
-<button onclick="undo()">Desfazer</button>
-
-<div class="status" id="status"></div>
+<button id="loginBtn">Login Google</button>
+<button id="logoutBtn">Logout</button>
+<button id="novaBtn">Nova</button>
 </header>
 
-<div class="grid" id="grid"></div>
+<div id="grid" class="grid"></div>
 
-<div class="players">
-<div class="box">A:<br><span id="A"></span></div>
-<div class="box">B:<br><span id="B"></span></div>
+<div>
+A: <span id="A"></span><br>
+B: <span id="B"></span>
 </div>
 
 <div class="history">
@@ -56,17 +36,13 @@ Bans <input id="numBan" value="2">
 <div id="history"></div>
 </div>
 
-<div class="history">
-<b>Dashboard</b>
-<div id="dashboard"></div>
-</div>
-
-<!-- FIREBASE -->
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
+// 🔥 CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyAZ0oBi3JraRKxxMQ3Gai7vgZZOL86sB-A",
   authDomain: "compile-draft-23ef2.firebaseapp.com",
@@ -79,197 +55,94 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-window.db = db;
-window.fb = { collection, addDoc, getDocs, deleteDoc, doc, updateDoc };
-window.auth = auth;
-window.provider = provider;
-window.signInWithPopup = signInWithPopup;
-window.signOut = signOut;
-window.onAuthStateChanged = onAuthStateChanged;
-</script>
+// ===== ESTADO =====
+let currentUser = null;
+let pool = ["Apathy","Clarity","Darkness","Fear","Hate","Light","Metal","Plague","Speed","Unity"];
+let restantes = [];
+let picks = {A:[], B:[]};
+let turno = 0;
+const ordem = ["A","B","B","A","A","B"];
 
-<script>
-console.log("App carregado");
+// ===== ELEMENTOS =====
+const authDiv = document.getElementById("auth");
+const grid = document.getElementById("grid");
+const Ael = document.getElementById("A");
+const Bel = document.getElementById("B");
+const historyDiv = document.getElementById("history");
 
 // ===== AUTH =====
-let currentUser = null;
-
 onAuthStateChanged(auth, user=>{
     currentUser = user;
-
-    const authDiv = document.getElementById("auth");
-
-    authDiv.innerHTML = user
-        ? `👤 ${user.displayName} <button onclick="logout()">Sair</button>`
-        : `<button onclick="login()">Login com Google</button>`;
-
-    carregarHistorico();
+    authDiv.innerText = user ? `👤 ${user.displayName}` : "não logado";
 });
 
-function login(){ signInWithPopup(auth, provider); }
-function logout(){ signOut(auth); }
+// ===== BOTÕES =====
+document.getElementById("loginBtn").onclick = ()=>signInWithPopup(auth, provider);
+document.getElementById("logoutBtn").onclick = ()=>signOut(auth);
+document.getElementById("novaBtn").onclick = novaPartida;
 
-// ===== DADOS =====
-let poolInicial = ["Apathy","Clarity","Darkness","Fear","Hate","Light","Metal","Plague","Speed","Unity",
-"Assimilation","Corruption","Death","Fire","Ice","Love","Mirror","Psychic","Spirit","War",
-"Chaos","Courage","Diversity","Gravity","Life","Luck","Peace","Smoke","Time","Water"];
-
-let pool=[...poolInicial];
-let restantes=[], picks={A:[],B:[]};
-let turno=0;
-const ordem=["A","B","B","A","A","B"];
-let historico=[];
-let stack=[];
-
-// ===== UNDO =====
-function salvarEstado(){
-    stack.push(JSON.stringify({restantes:[...restantes], picks:{A:[...picks.A],B:[...picks.B]}, turno}));
+// ===== JOGO =====
+function novaPartida(){
+    restantes = [...pool].sort(()=>Math.random()-0.5).slice(0,6);
+    picks = {A:[],B:[]};
+    turno = 0;
+    render();
 }
 
-function undo(){
-    if(!stack.length) return;
-    let s=JSON.parse(stack.pop());
-    restantes=s.restantes;
-    picks=s.picks;
-    turno=s.turno;
+function clicar(c){
+    let j = ordem[turno];
+    picks[j].push(c);
+    restantes = restantes.filter(x=>x!==c);
+    turno++;
+
+    if(turno===6) salvar();
+
     render();
 }
 
 // ===== FIREBASE =====
-async function carregarHistorico(){
-    const snapshot = await fb.getDocs(fb.collection(db,"matches"));
-    historico=[];
-    snapshot.forEach(d=>historico.push({id:d.id,...d.data()}));
-    historico.sort((a,b)=>b.createdAt-a.createdAt);
-    render();
-}
+async function salvar(){
+    if(!currentUser){
+        alert("login necessário");
+        return;
+    }
 
-async function salvarHistorico(){
-    if(!currentUser){ alert("Faça login"); return; }
-
-    await fb.addDoc(fb.collection(db,"matches"),{
+    await addDoc(collection(db,"matches"),{
         A:picks.A.join(", "),
         B:picks.B.join(", "),
-        winner:null,
-        userId: currentUser.uid,
-        userName: currentUser.displayName,
-        createdAt:Date.now()
+        user: currentUser.displayName
     });
 
-    carregarHistorico();
+    carregar();
 }
 
-async function setWinner(i,p){
-    let h=historico[i];
-    if(currentUser?.uid !== h.userId) return;
-
-    await fb.updateDoc(fb.doc(db,"matches",h.id),{winner:p});
-    carregarHistorico();
-}
-
-async function deleteMatch(i){
-    let h=historico[i];
-    if(currentUser?.uid !== h.userId) return;
-
-    await fb.deleteDoc(fb.doc(db,"matches",h.id));
-    carregarHistorico();
+async function carregar(){
+    const snap = await getDocs(collection(db,"matches"));
+    historyDiv.innerHTML="";
+    snap.forEach(d=>{
+        let h = d.data();
+        historyDiv.innerHTML += `<div>${h.user}<br>${h.A}<br>${h.B}</div><hr>`;
+    });
 }
 
 // ===== UI =====
 function render(){
-    A.innerText=picks.A.join(", ");
-    B.innerText=picks.B.join(", ");
+    Ael.innerText = picks.A.join(", ");
+    Bel.innerText = picks.B.join(", ");
 
     grid.innerHTML="";
     restantes.forEach(c=>{
-        let el=document.createElement("div");
+        let el = document.createElement("div");
         el.className="card";
         el.innerText=c;
         el.onclick=()=>clicar(c);
         grid.appendChild(el);
     });
-
-    const historyDiv = document.getElementById("history");
-
-    historyDiv.innerHTML = historico.map((h,i)=>{
-        const isOwner = currentUser && currentUser.uid === h.userId;
-
-        return `
-        <div>
-        <b>${h.userName || "anon"}</b><br>
-        ${h.A}<br>${h.B}<br>
-
-        ${isOwner ? `
-            <button onclick="setWinner(${i},'A')">A venceu</button>
-            <button onclick="setWinner(${i},'B')">B venceu</button>
-            <button onclick="deleteMatch(${i})">Excluir</button>
-        ` : `<i>somente o criador pode editar</i>`}
-
-        ${h.winner ? `<br><b>Vencedor: ${h.winner}</b>` : ""}
-        </div><hr>`;
-    }).join("");
-
-    renderDashboard();
 }
 
-// ===== DASHBOARD =====
-function renderDashboard(){
-    let valid=historico.filter(h=>h.winner);
-    if(!valid.length){ dashboard.innerHTML="Sem dados"; return; }
+// init
+carregar();
 
-    let stats={};
-
-    valid.forEach(h=>{
-        let Ateam=h.A.split(", ");
-        let Bteam=h.B.split(", ");
-
-        [...Ateam,...Bteam].forEach(p=>{
-            if(!stats[p]) stats[p]={pick:0,win:0};
-            stats[p].pick++;
-        });
-
-        (h.winner==="A"?Ateam:Bteam).forEach(p=>stats[p].win++);
-    });
-
-    let lista=Object.entries(stats)
-        .map(([n,v])=>({nome:n,wr:v.win/v.pick}))
-        .sort((a,b)=>b.wr-a.wr);
-
-    dashboard.innerHTML = `
-    <table>
-    ${lista.slice(0,10).map(p=>`
-    <tr><td>${p.nome}</td><td>${(p.wr*100).toFixed(0)}%</td></tr>`).join("")}
-    </table>`;
-}
-
-// ===== GAME =====
-function novaPartida(){
-    restantes=[...pool].sort(()=>Math.random()-0.5).slice(0,9);
-    picks={A:[],B:[]};
-    turno=0;
-    render();
-}
-
-function clicar(carta){
-    salvarEstado();
-    let j=ordem[turno];
-    picks[j].push(carta);
-    restantes=restantes.filter(x=>x!==carta);
-    turno++;
-    if(turno===6) salvarHistorico();
-    render();
-}
-
-// ===== GLOBAL =====
-window.novaPartida = novaPartida;
-window.undo = undo;
-window.login = login;
-window.logout = logout;
-window.setWinner = setWinner;
-window.deleteMatch = deleteMatch;
-
-// ===== INIT =====
-carregarHistorico();
 </script>
 
 </body>
