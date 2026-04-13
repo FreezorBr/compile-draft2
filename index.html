@@ -9,14 +9,44 @@
 body { margin:0; background:#111; color:#fff; font-family:-apple-system; }
 header { padding:10px; text-align:center; background:#1a1a1a; }
 
-button { padding:10px; margin:4px; border:none; border-radius:8px; background:#333; color:#fff; }
+button { 
+  padding:10px; 
+  margin:4px; 
+  border:none; 
+  border-radius:8px; 
+  background:#333; 
+  color:#fff; 
+  transition:0.15s;
+}
+
+button:active {
+  transform: scale(0.95);
+}
+
+.btnA:active {
+  background:#2b4eff;
+}
+
+.btnB:active {
+  background:#2faa2f;
+}
 button.small { padding:6px 8px; font-size:12px; }
 
 input { width:60px; text-align:center; border-radius:6px; border:none; }
 
 .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; padding:10px; }
 
-.card { padding:16px; background:#222; border-radius:10px; text-align:center; }
+.card { 
+  padding:16px; 
+  background:#222; 
+  cursor:pointer;
+  transition:0.15s;
+}
+
+.card:hover {
+  background:#333;
+  transform: scale(1.03);
+}
 
 .ban { background:#8b0000!important; }
 .pickA { background:#2b4eff!important; }
@@ -35,6 +65,13 @@ input { width:60px; text-align:center; border-radius:6px; border:none; }
 
 table { width:100%; border-collapse:collapse; margin-top:8px; }
 td,th { border-bottom:1px solid #333; padding:4px; font-size:11px; }
+.turnoA {
+  box-shadow: 0 0 10px #2b4eff;
+}
+
+.turnoB {
+  box-shadow: 0 0 10px #2faa2f;
+}       
 </style>
 </head>
 
@@ -179,7 +216,18 @@ function render(){
 
     // 🔥 ADICIONE AQUI
     const faseEl = document.getElementById("faseStatus");
+document.getElementById("boxA").classList.remove("turnoA");
+document.getElementById("boxB").classList.remove("turnoB");
 
+if(turno < 6){
+    let jogador = ordem[turno];
+
+    if(jogador === "A"){
+        document.getElementById("boxA").classList.add("turnoA");
+    } else {
+        document.getElementById("boxB").classList.add("turnoB");
+    }
+}
 if(turno === 0){
     faseEl.innerText = "Fase: Pick inicial (A começa)";
 }
@@ -226,8 +274,8 @@ function renderHistory(){
         <span ${corA}>A: ${h.A}</span><br>
         <span ${corB}>B: ${h.B}</span><br>
 
-        <button onclick="setWinnerById('${h.id}','A')">A venceu</button>
-        <button onclick="setWinnerById('${h.id}','B')">B venceu</button>
+<button class="btnA" onclick="setWinnerById('${h.id}','A')">A venceu</button>
+<button class="btnB" onclick="setWinnerById('${h.id}','B')">B venceu</button>
         <button onclick="deleteMatchById('${h.id}')">Excluir</button>
         </div><hr>`;
     }).join("");
@@ -250,7 +298,7 @@ function renderDashboard(){
     let valid = historico.filter(h=>h.winner);
 
     if(!valid.length){
-        dashboard.innerHTML = "<i>Sem dados</i>";
+        document.getElementById("dashboard").innerHTML = "<i>Sem dados</i>";
         return;
     }
 
