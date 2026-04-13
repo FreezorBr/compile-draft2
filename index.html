@@ -50,6 +50,7 @@ Seed <input id="seedInput" placeholder="auto">
 
 <div class="status" id="status"></div>
 Pool: <span id="poolSize"></span>
+  <div id="faseStatus"></div>
 </header>
 
 <div class="grid" id="grid"></div>
@@ -71,6 +72,21 @@ Pool: <span id="poolSize"></span>
 
 <script type="module">
 
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+function tocarSom(player){
+    let o = ctx.createOscillator();
+    let g = ctx.createGain();
+
+    o.connect(g);
+    g.connect(ctx.destination);
+
+    o.frequency.value = player === "A" ? 700 : 500;
+    g.gain.value = 0.05;
+
+    o.start();
+    o.stop(ctx.currentTime + 0.08);
+}
 // ===== FIREBASE =====
 import { initializeApp } 
 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -156,16 +172,31 @@ async function deleteMatch(i){
 
 // ===== RENDER =====
 function render(){
-    poolSize.innerText=pool.length;
-    A.innerText=picks.A.join(", ");
-    B.innerText=picks.B.join(", ");
+    poolSize.innerText = pool.length;
 
-    grid.innerHTML="";
+    A.innerText = picks.A.join(", ");
+    B.innerText = picks.B.join(", ");
+
+    // 🔥 ADICIONE AQUI
+    const faseEl = document.getElementById("faseStatus");
+
+    if(turno === 0){
+        faseEl.innerText = "Fase: Pick inicial";
+    }
+    else if(turno < 6){
+        faseEl.innerText = `Fase: Pick (${turno}/6)`;
+    }
+    else{
+        faseEl.innerText = "Fase: Finalizado";
+    }
+
+    grid.innerHTML = "";
+
     restantes.forEach(c=>{
-        let el=document.createElement("div");
-        el.className="card";
-        el.innerText=c;
-        el.onclick=()=>clicar(c);
+        let el = document.createElement("div");
+        el.className = "card";
+        el.innerText = c;
+        el.onclick = ()=>clicar(c);
         grid.appendChild(el);
     });
 
@@ -174,14 +205,21 @@ function render(){
 }
 
 function renderHistory(){
-    document.getElementById("history").innerHTML = historico.map((h)=>`
-    <div>
-    A:${h.A}<br>B:${h.B}<br>
-    <button onclick="setWinnerById('${h.id}','A')">A venceu</button>
-<button onclick="setWinnerById('${h.id}','A')">
-<button onclick="deleteMatchById('${h.id}')">
-    </div><hr>
-    `).join("");
+    document.getElementById("history").innerHTML = historico.map((h)=>{
+
+        let corA = h.winner === "A" ? "style='color:#4ea1ff'" : "";
+        let corB = h.winner === "B" ? "style='color:#5cff7a'" : "";
+
+        return `
+        <div>
+        <span ${corA}>A: ${h.A}</span><br>
+        <span ${corB}>B: ${h.B}</span><br>
+
+        <button onclick="setWinnerById('${h.id}','A')">A venceu</button>
+        <button onclick="setWinnerById('${h.id}','B')">B venceu</button>
+        <button onclick="deleteMatchById('${h.id}')">Excluir</button>
+        </div><hr>`;
+    }).join("");
 }
   async function setWinnerById(id,p){
     await updateDoc(doc(db,"matches",id), {
