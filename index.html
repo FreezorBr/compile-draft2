@@ -61,7 +61,7 @@ Bans <input id="numBan" value="2">
 <div id="dashboard"></div>
 </div>
 
-<!-- 🔥 FIREBASE -->
+<!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -89,26 +89,25 @@ window.onAuthStateChanged = onAuthStateChanged;
 </script>
 
 <script>
+console.log("App carregado");
+
 // ===== AUTH =====
 let currentUser = null;
 
 onAuthStateChanged(auth, user=>{
     currentUser = user;
 
+    const authDiv = document.getElementById("auth");
+
     authDiv.innerHTML = user
-        ? `Logado como ${user.displayName} <button onclick="logout()">Sair</button>`
+        ? `👤 ${user.displayName} <button onclick="logout()">Sair</button>`
         : `<button onclick="login()">Login com Google</button>`;
 
     carregarHistorico();
 });
 
-function login(){
-    signInWithPopup(auth, provider);
-}
-
-function logout(){
-    signOut(auth);
-}
+function login(){ signInWithPopup(auth, provider); }
+function logout(){ signOut(auth); }
 
 // ===== DADOS =====
 let poolInicial = ["Apathy","Clarity","Darkness","Fear","Hate","Light","Metal","Plague","Speed","Unity",
@@ -120,20 +119,33 @@ let restantes=[], picks={A:[],B:[]};
 let turno=0;
 const ordem=["A","B","B","A","A","B"];
 let historico=[];
+let stack=[];
+
+// ===== UNDO =====
+function salvarEstado(){
+    stack.push(JSON.stringify({restantes:[...restantes], picks:{A:[...picks.A],B:[...picks.B]}, turno}));
+}
+
+function undo(){
+    if(!stack.length) return;
+    let s=JSON.parse(stack.pop());
+    restantes=s.restantes;
+    picks=s.picks;
+    turno=s.turno;
+    render();
+}
 
 // ===== FIREBASE =====
 async function carregarHistorico(){
     const snapshot = await fb.getDocs(fb.collection(db,"matches"));
     historico=[];
     snapshot.forEach(d=>historico.push({id:d.id,...d.data()}));
+    historico.sort((a,b)=>b.createdAt-a.createdAt);
     render();
 }
 
 async function salvarHistorico(){
-    if(!currentUser){
-        alert("Faça login");
-        return;
-    }
+    if(!currentUser){ alert("Faça login"); return; }
 
     await fb.addDoc(fb.collection(db,"matches"),{
         A:picks.A.join(", "),
@@ -149,12 +161,16 @@ async function salvarHistorico(){
 
 async function setWinner(i,p){
     let h=historico[i];
+    if(currentUser?.uid !== h.userId) return;
+
     await fb.updateDoc(fb.doc(db,"matches",h.id),{winner:p});
     carregarHistorico();
 }
 
 async function deleteMatch(i){
     let h=historico[i];
+    if(currentUser?.uid !== h.userId) return;
+
     await fb.deleteDoc(fb.doc(db,"matches",h.id));
     carregarHistorico();
 }
@@ -173,14 +189,25 @@ function render(){
         grid.appendChild(el);
     });
 
-    history.innerHTML = historico.map((h,i)=>`
-    <div>
-    <b>${h.userName || "anon"}</b><br>
-    ${h.A}<br>${h.B}<br>
-    <button onclick="setWinner(${i},'A')">A venceu</button>
-    <button onclick="setWinner(${i},'B')">B venceu</button>
-    <button onclick="deleteMatch(${i})">Excluir</button>
-    </div><hr>`).join("");
+    const historyDiv = document.getElementById("history");
+
+    historyDiv.innerHTML = historico.map((h,i)=>{
+        const isOwner = currentUser && currentUser.uid === h.userId;
+
+        return `
+        <div>
+        <b>${h.userName || "anon"}</b><br>
+        ${h.A}<br>${h.B}<br>
+
+        ${isOwner ? `
+            <button onclick="setWinner(${i},'A')">A venceu</button>
+            <button onclick="setWinner(${i},'B')">B venceu</button>
+            <button onclick="deleteMatch(${i})">Excluir</button>
+        ` : `<i>somente o criador pode editar</i>`}
+
+        ${h.winner ? `<br><b>Vencedor: ${h.winner}</b>` : ""}
+        </div><hr>`;
+    }).join("");
 
     renderDashboard();
 }
@@ -224,6 +251,7 @@ function novaPartida(){
 }
 
 function clicar(carta){
+    salvarEstado();
     let j=ordem[turno];
     picks[j].push(carta);
     restantes=restantes.filter(x=>x!==carta);
@@ -231,6 +259,17 @@ function clicar(carta){
     if(turno===6) salvarHistorico();
     render();
 }
+
+// ===== GLOBAL =====
+window.novaPartida = novaPartida;
+window.undo = undo;
+window.login = login;
+window.logout = logout;
+window.setWinner = setWinner;
+window.deleteMatch = deleteMatch;
+
+// ===== INIT =====
+carregarHistorico();
 </script>
 
 </body>
