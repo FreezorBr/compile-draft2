@@ -263,7 +263,7 @@ function clicar(c){
 
     if(!picks[j]){
         picks[j] = [];
-    }function clicar(c){
+ function clicar(c){
     if(turno >= ordem.length) return;
 
     let j = ordem[turno];
@@ -274,7 +274,7 @@ function clicar(c){
 
     picks[j].push(c);
 
-    // 🔥 cor visual imediata
+    // 🎨 cor visual
     const cards = document.querySelectorAll(".card");
     cards.forEach(card=>{
         if(card.innerText === c){
