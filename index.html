@@ -164,7 +164,7 @@ function render(){
 }
 
 function renderHistory(){
-    history.innerHTML = historico.map((h,i)=>`
+    document.getElementById("history").innerHTML = historico.map((h,i)=>`
     <div>
     A:${h.A}<br>B:${h.B}<br>
     <button onclick="setWinner(${i},'A')">A venceu</button>
@@ -251,7 +251,11 @@ function resetPool(){
     pool=[...poolInicial];
     render();
 }
-
+  
+window.novaPartida = novaPartida;
+window.resetPool = resetPool;
+window.setWinner = setWinner;
+window.deleteMatch = deleteMatch;
 // ===== INIT =====
 carregarHistorico();
 
