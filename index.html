@@ -72,9 +72,18 @@ Pool: <span id="poolSize"></span>
 <script type="module">
 
 // ===== FIREBASE =====
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } 
-from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  getDocs, 
+  deleteDoc, 
+  doc, 
+  updateDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const app = initializeApp({
   apiKey: "AIzaSyAZ0oBi3JraRKxxMQ3Gai7vgZZOL86sB-A",
   authDomain: "compile-draft-23ef2.firebaseapp.com",
