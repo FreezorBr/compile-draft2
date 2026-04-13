@@ -69,7 +69,27 @@ Pool global: <span id="poolSize"></span>
 <b>Dashboard</b>
 <div id="dashboard"></div>
 </div>
+    
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+const firebaseConfig = {
+  apiKey: AIzaSyAZ0oBi3JraRKxxMQ3Gai7vgZZOL86sB-A",
+  authDomain: "compile-draft-23ef2.firebaseapp.com",
+  projectId: "compile-draft-23ef2",
+  storageBucket: "compile-draft-23ef2.firebasestorage.app",
+  messagingSenderId: "357072569533",
+  appId: "1:357072569533:web:3975e4a51462e5c09c23d4"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// deixar global
+window.db = db;
+window.fb = { collection, addDoc, getDocs, deleteDoc, doc };
+</script>
 <script>
 // ===== DADOS =====
 let poolInicial = [
@@ -198,17 +218,33 @@ function renderHistory(){
     }).join("");
 }
 
-function salvarHistorico(){
-    historico.unshift({
-        A:picks.A.join(", "),
-        B:picks.B.join(", "),
-        config:{prot:numProt.value,bans:numBan.value},
-        seed:seedInput.value,
-        winner:null,
-        data:new Date().toLocaleString()
+async function salvarHistorico(){
+    const data = {
+        A: picks.A.join(", "),
+        B: picks.B.join(", "),
+        config: {
+            prot: numProt.value,
+            bans: numBan.value
+        },
+        seed: seedInput.value,
+        winner: null,
+        createdAt: Date.now()
+    };
+
+    await fb.addDoc(fb.collection(db, "matches"), data);
+}
+    async function carregarHistoricoGlobal(){
+    const querySnapshot = await fb.getDocs(fb.collection(db, "matches"));
+
+    historico = [];
+
+    querySnapshot.forEach(docSnap=>{
+        historico.push({ id: docSnap.id, ...docSnap.data() });
     });
 
-    localStorage.setItem("draftHistory", JSON.stringify(historico));
+    historico.sort((a,b)=>b.createdAt - a.createdAt);
+
+    render();
 }
 
 function setWinner(i,p){
@@ -358,7 +394,7 @@ function resetPool(){
 }
 
 // ===== INIT =====
-render();
+carregarHistoricoGlobal();
 </script>
 
 </body>
