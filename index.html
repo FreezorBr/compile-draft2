@@ -310,28 +310,7 @@ function renderDashboard(){
                     if(w)combos[k].w++;
                 }
             }
-        }
-
-        pairs(A,h.winner==="A");
-        pairs(B,h.winner==="B");
-    });
-
-    let lista=Object.entries(stats).map(([n,v])=>({
-        n,wr:v.w/v.p
-    })).sort((a,b)=>b.wr-a.wr);
-
-    let comb=Object.entries(combos).map(([n,v])=>({
-        n,wr:v.w/v.p
-    })).sort((a,b)=>b.wr-a.wr);
-
-    dashboard.innerHTML=`
-    <b>Top Protocolos</b>
-    ${lista.slice(0,5).map(x=>`${x.n} ${(x.wr*100).toFixed(0)}%`).join("<br>")}
-    <br><br>
-    <b>Combos</b>
-    ${comb.slice(0,5).map(x=>`${x.n} ${(x.wr*100).toFixed(0)}%`).join("<br>")}
-    `;
-
+       
 // ===== GAME =====
 function novaPartida(){
     restantes=shuffle([...pool]).slice(0,numProt.value);
