@@ -46,7 +46,6 @@ Bans <input id="numBan" value="2">
 Seed <input id="seedInput" placeholder="auto">
 <br>
 <button onclick="novaPartida()">Nova</button>
-<button onclick="undo()">Desfazer</button>
 <button onclick="resetPool()">Reset Pool</button>
 
 <div class="status" id="status"></div>
@@ -73,8 +72,8 @@ Pool: <span id="poolSize"></span>
 <script type="module">
 
 // ===== FIREBASE =====
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const app = initializeApp({
   apiKey: "AIzaSyAZ0oBi3JraRKxxMQ3Gai7vgZZOL86sB-A",
@@ -131,10 +130,12 @@ async function carregarHistorico(){
 }
 
 async function setWinner(i,p){
-    let h=historico[i];
-    await deleteDoc(doc(db,"matches",h.id));
-    h.winner=p;
-    await addDoc(collection(db,"matches"),h);
+    let h = historico[i];
+
+    await updateDoc(doc(db,"matches",h.id), {
+        winner: p
+    });
+
     carregarHistorico();
 }
 
@@ -164,14 +165,26 @@ function render(){
 }
 
 function renderHistory(){
-    document.getElementById("history").innerHTML = historico.map((h,i)=>`
+    document.getElementById("history").innerHTML = historico.map((h)=>`
     <div>
     A:${h.A}<br>B:${h.B}<br>
-    <button onclick="setWinner(${i},'A')">A venceu</button>
-    <button onclick="setWinner(${i},'B')">B venceu</button>
-    <button onclick="deleteMatch(${i})">Excluir</button>
+    <button onclick="setWinnerById('${h.id}','A')">A venceu</button>
+<button onclick="setWinnerById('${h.id}','A')">
+<button onclick="deleteMatchById('${h.id}')">
     </div><hr>
     `).join("");
+}
+  async function setWinnerById(id,p){
+    await updateDoc(doc(db,"matches",id), {
+        winner: p
+    });
+
+    carregarHistorico();
+}
+
+async function deleteMatchById(id){
+    await deleteDoc(doc(db,"matches",id));
+    carregarHistorico();
 }
 
 // ===== DASHBOARD =====
@@ -254,8 +267,9 @@ function resetPool(){
   
 window.novaPartida = novaPartida;
 window.resetPool = resetPool;
-window.setWinner = setWinner;
-window.deleteMatch = deleteMatch;
+
+window.setWinnerById = setWinnerById;
+window.deleteMatchById = deleteMatchById;
 // ===== INIT =====
 carregarHistorico();
 
