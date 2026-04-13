@@ -180,25 +180,36 @@ function render(){
     // 🔥 ADICIONE AQUI
     const faseEl = document.getElementById("faseStatus");
 
-    if(turno === 0){
-        faseEl.innerText = "Fase: Pick inicial";
-    }
-    else if(turno < 6){
-        faseEl.innerText = `Fase: Pick (${turno}/6)`;
-    }
-    else{
-        faseEl.innerText = "Fase: Finalizado";
-    }
+if(turno === 0){
+    faseEl.innerText = "Fase: Pick inicial (A começa)";
+}
+else if(turno < 6){
+    let jogador = ordem[turno];
+    faseEl.innerText = `Fase: Pick (${turno}/6) → Turno de ${jogador}`;
+}
+else{
+    faseEl.innerText = "Fase: Finalizado";
+}
 
     grid.innerHTML = "";
 
-    restantes.forEach(c=>{
-        let el = document.createElement("div");
-        el.className = "card";
-        el.innerText = c;
-        el.onclick = ()=>clicar(c);
-        grid.appendChild(el);
-    });
+  restantes.forEach(c=>{
+    let el = document.createElement("div");
+    el.className = "card";
+    el.innerText = c;
+
+    // 🎨 cor persistente
+    if(picks.A.includes(c)){
+        el.classList.add("pickA");
+    }
+    else if(picks.B.includes(c)){
+        el.classList.add("pickB");
+    }
+
+    el.onclick = ()=>clicar(c);
+
+    grid.appendChild(el);
+});
 
     renderHistory();
     renderDashboard();
@@ -236,20 +247,60 @@ async function deleteMatchById(id){
 
 // ===== DASHBOARD =====
 function renderDashboard(){
-    let valid=historico.filter(h=>h.winner);
-    if(!valid.length){dashboard.innerHTML="Sem dados";return;}
+    let valid = historico.filter(h=>h.winner);
 
-    let stats={},combos={};
+    if(!valid.length){
+        dashboard.innerHTML = "<i>Sem dados</i>";
+        return;
+    }
+
+    let stats = {};
 
     valid.forEach(h=>{
-        let A=h.A.split(", "),B=h.B.split(", ");
-        [...A,...B].forEach(p=>{
-            if(!stats[p])stats[p]={p:0,w:0};
-            stats[p].p++;
+        let A = h.A.split(", ");
+        let B = h.B.split(", ");
+
+        [...A, ...B].forEach(p=>{
+            if(!stats[p]) stats[p] = {pick:0, win:0};
+            stats[p].pick++;
         });
 
-        (h.winner==="A"?A:B).forEach(p=>stats[p].w++);
+        if(h.winner==="A"){
+            A.forEach(p=>stats[p].win++);
+        } else {
+            B.forEach(p=>stats[p].win++);
+        }
+    });
 
+    let lista = Object.entries(stats).map(([nome,v])=>({
+        nome,
+        pick: v.pick,
+        win: v.win,
+        wr: v.win / v.pick
+    })).sort((a,b)=>b.wr - a.wr);
+
+    dashboard.innerHTML = `
+    <table>
+        <tr>
+            <th>Prot</th>
+            <th>Picks</th>
+            <th>Wins</th>
+            <th>WR%</th>
+        </tr>
+        ${
+            lista.map(p=>`
+            <tr>
+                <td>${p.nome}</td>
+                <td>${p.pick}</td>
+                <td>${p.win}</td>
+                <td>${(p.wr*100).toFixed(0)}%</td>
+            </tr>
+            `).join("")
+        }
+    </table>
+    `;
+}
+});
         function pairs(t,w){
             for(let i=0;i<t.length;i++){
                 for(let j=i+1;j<t.length;j++){
