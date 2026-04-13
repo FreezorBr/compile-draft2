@@ -300,17 +300,6 @@ function renderDashboard(){
     </table>
     `;
 }
-});
-        function pairs(t,w){
-            for(let i=0;i<t.length;i++){
-                for(let j=i+1;j<t.length;j++){
-                    let k=[t[i],t[j]].sort().join("+");
-                    if(!combos[k])combos[k]={p:0,w:0};
-                    combos[k].p++;
-                    if(w)combos[k].w++;
-                }
-            }
-       
 // ===== GAME =====
 function novaPartida(){
     restantes=shuffle([...pool]).slice(0,numProt.value);
